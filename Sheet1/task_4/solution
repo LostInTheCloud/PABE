@@ -1,0 +1,21 @@
+#!/usr/bin/python3
+import subprocess
+
+def get_seccomp(pid:int):
+    f = open("/proc/"+str(pid)+"/status")
+    while(line:=f.readline()):
+        if "Seccomp" in line:
+            return int(line.split()[1])
+    return -1
+
+def get_pids():
+    import psutil
+    # for p in psutil.process_iter(attrs=["pid", "name"]):
+        #print(p.pid)
+    return [p.pid for p in psutil.process_iter(attrs=["pid", "name"])]
+
+pids = get_pids()
+sum = 0
+for pid in pids:
+    sum+= get_seccomp(pid)
+print(sum)

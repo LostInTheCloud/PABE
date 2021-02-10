@@ -1,0 +1,28 @@
+#!/usr/bin/python3
+
+""" valid key has 32 capital alpha chars
+
+32nd char + 4 must be smaller than the 1st
+
+sum of all chars must be 'odd' """
+
+key = "ZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" # basekey
+key_l = list(key) # change to list so we can modify
+
+for i in range(500): # give 500 keys
+    j = int(i/100) # first digit of 'serial number'
+    k = int((i - j*100) / 10) # second digit
+    l = int((i - j*100 - k*10)) # third digit
+    
+    # now we shift the chars around a bit.
+    # to offset change in the odd-property, 
+    # we use XXYYZZ to correspond to XYZ serial numbers
+
+    key_l[1] = chr(65+j)
+    key_l[2] = chr(65+j)
+    key_l[3] = chr(65+k)
+    key_l[4] = chr(65+k)
+    key_l[5] = chr(65+l)
+    key_l[6] = chr(65+l)
+
+    print("".join(key_l))

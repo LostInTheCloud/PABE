@@ -1,0 +1,37 @@
+#!/usr/bin/python3
+
+import subprocess
+
+
+def byte_xor(b1, b2):
+    return bytes([b1_ ^ b2_ for b1_, b2_ in zip(b1, b2)])
+
+
+def decode_8bit(filename:str, key:int)->None:
+    in_file = open(filename, "r+b")
+    out_file = open(filename+"_", "w+b")
+    i:int = 0
+    while (byte := in_file.read(1)):
+        new = byte_xor(byte, b'\x42')
+        if i < 64:
+            out_file.write(new)
+        else:
+            out_file.write(byte)
+        i+=1
+    in_file.close()
+    out_file.close()
+        
+
+def determine_key(filename:str)->int:
+    in_file = open(filename, "r+b")
+    byte = in_file.read(1)
+    key = byte_xor(byte, b'\x7f')
+    return key
+
+
+filename:str = "fixme"
+key = determine_key(filename) # key=0x42
+decode_8bit(filename, key)
+subprocess.call(["chmod", "+x", filename+"_"])
+subprocess.call(["./"+filename+"_"])
+subprocess.call(["rm", filename+"_"])

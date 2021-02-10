@@ -1,0 +1,52 @@
+#!/usr/bin/python3
+
+from z3 import *
+
+s = Solver()
+key = Ints('x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16 x17 x18 x19 x20 x21 x22 x23 x24 x25 x26 x27 x28 x29 x30 x31')
+
+for i in range(0x20):   # every char...
+    s.add(
+        Or( # needs to be either...
+            (   # ALPHA
+                And (key[i] >= ord('A') ,
+                key[i] <= ord('Z'))
+            ),
+            (   # alpha
+                And (key[i] >= ord('a') ,
+                key[i] <= ord('z'))
+            ),
+            (   # or num
+                And (key[i] >= ord('0') ,
+                key[i] <= ord('9'))
+            )
+        )
+    )
+
+s.add(key[1] >= key[0] -2)
+s.add(key[2] >= key[1] -2)
+s.add(key[3] >= key[2] -2)
+s.add(key[3] < key[4] -9)
+s.add(key[4] < key[5] -9)
+s.add(key[5] <  key[6] -9)
+s.add(key[7] >= key[6] -5)
+s.add(key[8] >= key[7] -5)
+s.add(key[9] >= key[8] -5)
+s.add(key[0]*2 >= key[31])
+s.add(key[1]*2 >= key[30])
+s.add(key[2]*2 >= key[29])
+
+for i in range (0x10,0x1f):
+    s.add(key[i]<key[i+1])
+
+s.add(((key[0x0]+key[0x2]+key[0x4]+key[0x6]+key[0x8]+key[0xA]+key[0xC]+key[0xE]+key[0x10]+
+key[0x12]+key[0x14]+key[0x16]+key[0x18]+key[0x1A]+key[0x1C]+key[0x1E])%2) == 0)
+
+# solve
+s.check()
+values = s.model()
+
+# print result
+for i in range(0x20):
+    print(chr(values[key[i]].as_long()), end='')
+print("")

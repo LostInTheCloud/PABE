@@ -1,0 +1,38 @@
+#!/usr/bin/python3
+
+"""
+After reversing, this is the rough code:
+
+undefined8 FUN_001011cb(int param_1,long param_2)
+{
+  size_t sVar1;
+  signal(0xb,FUN_00101185);
+  if (((1 < param_1) && (*(char *)(*(long *)(param_2 + 8) + 9) == 'x')) &&
+     (sVar1 = strlen(*(char **)(param_2 + 8)), (sVar1 & 3) == 0)) {
+    FUN_001011a9(*(char **)(param_2 + 8));
+    printf("Thanks! Your string is: %s",*(undefined8 *)(param_2 + 8));
+  }
+  return 0;
+}
+
+In the signal call, the flag printing function is called when a sigsev signal is received. Thus causing a sigsev is our target.
+Within the if clause, FUN_001011a9, a function which copies the argument string into a 16 bytes long local array. Since the array is local, 
+causing an overflow will effect the stack and hopefully cause an overflow. Using any string longer than 15? characters should suffice.
+
+First a small intermezzo regarding param_2+8;, since the datatype of param_2 is long, adding 8 will do just that. Interpreting that number then as
+a pointer to char*, i.e. another pointer, a datatype of length 8 bytes, points then to the second element.
+Thus (char *)(*(long *)(param_2 + 8) is equal to ((char *)param_2)[1]. Since param_2 is set to the value of argv, it references the first argument passed to the program.
+
+To fullfil the if clause, we then need to satisfy 3 and'ed subclauses.
+1 < param_1 is trivial, passing one argument will result in argc being at least 2, which param_1 is a value copy of.
+(*(char *)(*(long *)(param_2 + 8) + 9) describes as shown above argv[1][9], i.e. the 10th element of the first argument. This must be equal to 'x'.
+Further, the length of the first argument must be a multiple of 4.
+
+Thus a valid input might be oooooooooxoo(oooo)*, with 'o' being any^1 character
+
+^1 any is a strong word, and some, like \0x0 will obviously not work.
+
+"""
+
+import subprocess
+subprocess.call(["./simple_bo", "123456789x123456"])

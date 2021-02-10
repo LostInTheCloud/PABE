@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+from pwn import *
+
+exe = context.binary = ELF("./exploitme", checksec=False)
+context.log_level = "error"
+
+
+def start(argv=[], *a, **kw):
+    gdbscript = """
+    tbreak main
+    continue
+    """.format(
+        **locals()
+    )
+
+    if args.GDB:
+        context.log_level = "debug"
+        context.terminal = ["tmux", "split", "-h"]
+        return gdb.debug([exe.path] + argv, gdbscript=gdbscript, aslr=False, *a, **kw)
+    else:
+        return process([exe.path] + argv, *a, **kw)
+
+# shellcode is result of shellcode.c
+
+def main():
+    io = start()
+
+
+if __name__ == "__main__":
+    main()

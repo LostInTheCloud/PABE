@@ -1,0 +1,52 @@
+#!/usr/bin/python3
+
+# what we got:
+# 08049000 <_start>:
+# 8049000:       b8 01 00 00 00          mov    eax,0x1
+# 8049005:       bb 01 00 00 00          mov    ebx,0x1
+# 804900a:       b9 00 a0 04 08          mov    ecx,0x804a000
+# 804900f:       ba 01 00 00 00          mov    edx,0x1
+# 8049014:       90                      nop
+# 8049015:       90                      nop
+# 8049016:       b8 01 00 00 00          mov    eax,0x1
+# 804901b:       bb 2a 00 00 00          mov    ebx,0x2a
+# 8049020:       cd 80                   int    0x80
+
+# what we need
+# 08049000 <_start>:
+# 8049000:       b8 04 00 00 00          mov    eax,0x4        ; here change syscall from exit to write
+# 8049005:       bb 01 00 00 00          mov    ebx,0x1        
+# 804900a:       b9 00 a0 04 08          mov    ecx,0x804a000
+# 804900f:       ba 24 00 00 00          mov    edx,0x24       ; change length of buffer to 0x24
+# 8049014:       cd 80                   int    0x80           ; here create a syscall
+# 8049016:       b8 01 00 00 00          mov    eax,0x1
+# 804901b:       bb 2a 00 00 00          mov    ebx,0x2a
+# 8049020:       cd 80                   int    0x80
+
+import pwnlib.asm as asm
+import subprocess
+
+f = open("broken", "r+b")
+
+# change syscall
+f.seek(0x1000)
+# op = asm.asm('mov eax, 0x4')
+op = b'\xb8\x04\x00\x00\x00'
+f.write(op)
+
+# change length of buffer
+f.seek(0x100f)
+# op = asm.asm('mov edx,0x24')
+op = b'\xba$\x00\x00\x00'
+f.write(op)
+
+# add interupt
+f.seek(0x1014)
+# op = asm.asm('int 0x80')
+op = b'\xcd\x80'
+f.write(op)
+
+f.close()
+
+subprocess.call(["chmod", "+x", "broken"])
+subprocess.call(["./broken"])

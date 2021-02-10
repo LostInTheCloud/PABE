@@ -1,0 +1,7 @@
+#!/usr/bin/python3
+
+import subprocess
+
+# subprocess.call(["cmake", "."])
+subprocess.call(["gcc", "-o", "broken", "broken.c"])
+subprocess.call(["./broken", "PABE"])

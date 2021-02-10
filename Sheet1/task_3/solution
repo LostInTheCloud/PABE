@@ -1,0 +1,13 @@
+#!/usr/bin/python3
+
+sum = 0
+f = open("data.bin", "rb")
+sum+=int.from_bytes(f.read(2), "big")
+sum+=int.from_bytes(f.read(1), "little")
+sum+=int.from_bytes(f.read(1), "little")
+sum+=int.from_bytes(f.read(8), "big")
+hex_str = f.read(6).decode("utf-8")
+val = int(hex_str, 16)
+sum+=val
+print(sum)
+f.close()

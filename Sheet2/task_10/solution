@@ -1,0 +1,71 @@
+#!/usr/bin/python2
+
+from __future__ import print_function
+
+from pwn import *
+from unicorn import *
+from unicorn.x86_const import *
+
+
+def hook_code(uc, address, size, user_data):
+    print(">>> tracing eip = 0x%x " % address)
+    print(disasm(uc.mem_read(address, size)))
+
+
+def main():
+    simple_asm = """
+        xor eax, eax
+        xor ebx, ebx
+        xor ecx, ecx
+        mov ecx, 0x1
+        mov eax, [0x31337]
+        mov ebx, 0x42
+        add eax, ebx
+        shl ecx, 0x2
+        add eax, ecx
+        push eax
+        push ebx
+        pop ecx
+        pop edx
+        lea eax, [ecx+eax]
+        lea ebx, [edx+ebx]
+    """
+
+    simple_asm_bytes = asm(simple_asm)
+
+    start_address_memory = 0x1000000
+
+    try:
+        # create the Unicorn Engine eenginelator
+        engine = Uc(UC_ARCH_X86, UC_MODE_32)
+
+        # memory for the machine code
+        engine.mem_map(start_address_memory, 2 * 1024 * 1024)
+
+        # write the machine code to the memory
+        engine.mem_write(start_address_memory, simple_asm_bytes)
+
+        # trace instructions for debugging
+        engine.hook_add(UC_HOOK_CODE, hook_code)
+
+        # start the emulation
+        engine.emu_start(start_address_memory, start_address_memory + len(simple_asm_bytes))
+
+        # get the register contents
+        r_eax = engine.reg_read(UC_X86_REG_EAX)
+        r_ebx = engine.reg_read(UC_X86_REG_EBX)
+        r_ecx = engine.reg_read(UC_X86_REG_ECX)
+        r_edx = engine.reg_read(UC_X86_REG_EDX)
+
+        # print the register contents
+        print("eax = 0x%x" % r_eax)
+        print("ebx = 0x%x" % r_ebx)
+        print("ecx = 0x%x" % r_ecx)
+        print("edx = 0x%x" % r_edx)
+
+    except UcError as e:
+        print("ERROR: %s" % e)
+
+
+if __name__ == "__main__":
+    main()
