@@ -18,6 +18,11 @@ search string with `find <start_addr>, <end_addr>, "/bin/sh"`
 
 ---
 
+Websites:
+
+- godbolt.org Online C to Assembly
+- http://shell-storm.org/online/Online-Assembler-and-Disassembler/ Assembler and Disassembler
+- https://www.rapidtables.com/convert/number/hex-dec-bin-converter.html Converter
 
 ## Theoretical Cheats
 ---
@@ -44,4 +49,39 @@ determines the syscalls the process can invoke
 
 <img src="docs/todo.png" alt="drawing" width="200"/>
 
-### Static Analysis
+### Static Analysis (whiteboxing)
+
+- parse the binary directly
+- semantic gap
+- we need dataflow analysis to track variables
+
+Symbolic execution:
+
+<img src="docs/symbolic_executionpng.png" alt="drawing" width="500"/>
+
+---
+
+Dissassembly:
+
+- **Linear Sweep:** disassemble a stream of bytes into successive instructions
+- **Recursive Traversal:** follow the control flow to disassemble
+
+---
+
+#### Calling Conventions
+
+| name | arch | parametres | return | cleanup | perserves |
+|:---: |:---: |:---:       |:---:   |:---:    |:---:      |
+| **cdecl** | x86 gcc | push p_n ... push p_1 | eax | caller |all but eax, ecx, edx|
+| **AMD64 ABI** | x64 gcc | rdi, rsi, rdx, rcx, r8, r9| rax | caller | all but eax, ecx, edx|
+| **fastcall** | x86 Win | who | the | fuck | cares | 
+| **MS x64 CC** | x64 Win | who | the | fuck | cares |
+
+---
+
+### Dynamic Analysis (blackboxing)
+
+- fuzzing
+- sandbox
+- emulation
+- debugging
