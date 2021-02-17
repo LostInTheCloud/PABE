@@ -1,6 +1,16 @@
 # PABE WS 2020/2021
 
 ## Practical Cheats
+
+---
+
+### Vulnerability Types
+
+- Buffer Overflow (on stack and heap)
+- Format String
+- Use After Free
+- ...
+
 ---
 install stuff
 ```
@@ -8,7 +18,7 @@ sudo pacman -S gdb pwndbg python python-pwntools code git \
                ghidra nmap gcc lib32-gcc-libs lib32-glibc
 ```
 ---
-use PWNDBG  
+use **PWNDBG**
 ```
 echo 'source /usr/share/pwndbg/gdbinit.py' >> ~/.gdbinit
 ```
@@ -39,7 +49,8 @@ Websites:
 
 Strip symbols and sections: `strip a.out`  
 Tracing: `ltrace` or `strace`  
-Fiding bugs: `valgrind` or `-fsanitize-address`
+Fiding bugs: `valgrind` or `-fsanitize-address`  
+Finding strings in binary: `strings a.out`
 
 ---
 
@@ -60,8 +71,8 @@ Stack alignment:
 
 ---
 Seccomp:  
-in `cat /proc/<id>/status`  
-determines the syscalls the process can invoke
+- in `cat /proc/<id>/status`  
+- determines the syscalls the process can invoke
 
 ---
 ### ELF Files
@@ -104,3 +115,36 @@ Dissassembly:
 - sandbox
 - emulation
 - debugging
+
+---
+
+### Vuln Research
+
+> Bug != Vulnerability != Exploit
+
+Target CIA: 
+- Confidentiallity
+- Integrity
+- Availability
+
+Scoping: choosing elements to analyse instead of the whole thing
+
+Attack Surfaces:
+- Arguments
+- stdin
+- env vars
+- files
+- network sockets
+- signals / exceptions
+
+C Language Issues:
+- Unerflows/Overflows
+- Truncations
+- Stack Overflows
+- Heap Overflows
+- Out of Scope
+- Out of Bounds
+- Double Free
+- Memory Leaks
+
+> TODO: C TYPE PROMOTION??? <img src="docs/todo.png" alt="drawing" width="38"/>
