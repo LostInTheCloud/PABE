@@ -8,13 +8,24 @@ sudo pacman -S gdb pwndbg python python-pwntools code git \
                ghidra nmap gcc lib32-gcc-libs lib32-glibc
 ```
 ---
-use PWNDBG
+use PWNDBG  
 ```
 echo 'source /usr/share/pwndbg/gdbinit.py' >> ~/.gdbinit
 ```
+run with args `run foo bar`  
+cond. breakpoints `break *<addr> if $rax == 0x3`  
+watchpoints `watch/rwatch/awatch *<addr>` (write/read/access)  
+step over and step into `ni / si`  
+examine memory `x /<n><size><fmt> <addr>` (n=number; size=h,w,d,g; fmt=**S**tring, he**X**, **I**nstruction)  
+altering registers `set $rip = <addr>`  
 get maps with `vmmap`  
 seach function with `p system`  
-search string with `find <start_addr>, <end_addr>, "/bin/sh"`
+search string with `find <start_addr>, <end_addr>, "/bin/sh"`  
+time traveling:
+ - enable recording `target record-full` 
+ - reverse continue `rc`
+ - reverse step over `rni`
+ - backwards execution `set exec-direction reverse`
 
 ---
 
@@ -23,6 +34,14 @@ Websites:
 - godbolt.org Online C to Assembly
 - http://shell-storm.org/online/Online-Assembler-and-Disassembler/ Assembler and Disassembler
 - https://www.rapidtables.com/convert/number/hex-dec-bin-converter.html Converter
+
+---
+
+Strip symbols and sections: `strip a.out`  
+Tracing: `ltrace` or `strace`  
+Fiding bugs: `valgrind` or `-fsanitize-address`
+
+---
 
 ## Theoretical Cheats
 ---
