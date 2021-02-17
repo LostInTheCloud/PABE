@@ -148,3 +148,11 @@ C Language Issues:
 - Memory Leaks
 
 > TODO: C TYPE PROMOTION??? <img src="docs/todo.png" alt="drawing" width="38"/>
+
+### ASAN
+
+<img src="docs/todo.png" alt="drawing" width="200"/>
+
+### Fuzzing
+
+<img src="docs/todo.png" alt="drawing" width="200"/>
