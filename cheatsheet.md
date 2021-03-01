@@ -54,6 +54,15 @@ Finding strings in binary: `strings a.out`
 
 ---
 
+Further Tools: 
+
+- CVE-Checker FKIE
+- Frida
+- guyinatuxedo/remenissions
+- tsunami
+- Binary Ninja (to use API in Python)
+---
+
 ## Theoretical Cheats
 ---
 ### Linux and System
@@ -156,3 +165,46 @@ C Language Issues:
 ### Fuzzing
 
 <img src="docs/todo.png" alt="drawing" width="200"/>
+
+### CVE vs CWE
+
+- Common Vulnerabilities and Exposures: a weakness in a program
+
+- Common Weakness Enumeration: an abstract list of types of weaknesses
+
+### Dataflow analysis
+
+Backwardslice: Trace a value to its origin.
+
+### Intermediate Representation
+
+- vex:
+
+- reil: 
+
+- llvm:
+
+- esil: stack based represenation (used in radare)
+
+- bil: 
+
+- bnil: binary ninja intermediate language
+
+- SSA: every variable only gets defined and assigned ONCE. When overwritten, SSA creates a new variable.
+
+- SSA+PHI: if a variable depends on multiple others dependent on flow | `var_8#2 := PHI(var_8#0, var_8#1)`
+
+- Taint Analysis: check where the variables 'come from', i.e. if `var_8#3` maybe was already checked as `var_8#2`
+
+- Dominance Tree: A dominates B if every path to B stems from A
+
+- Z3 to see if logic checks out
+
+- value set analysis: not all input params produce the same flow. We can check if different possible paths are feasible or break logic, to reduce the amount of paths.
+
+- can only have **two**
+
+    - Termination
+    - Soundness (all facts)
+    - Completeness (only facts)
+
