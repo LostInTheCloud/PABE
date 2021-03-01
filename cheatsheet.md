@@ -47,6 +47,8 @@ Websites:
 
 ---
 
+See security measures of binary: `checksec ./a.out`  
+See info about the ELF Header: `readelf -h a.out`  
 Strip symbols and sections: `strip a.out`  
 Tracing: `ltrace` or `strace`  
 Fiding bugs: `valgrind` or `-fsanitize-address`  
@@ -208,3 +210,36 @@ Backwardslice: Trace a value to its origin.
     - Soundness (all facts)
     - Completeness (only facts)
 
+---
+
+### Binary Exploitation
+
+#### Buffer overflow: 
+
+- return to a function in the binary
+- return to shellcode injected by pwner
+    - shellcode needs to fit into buffer (?)
+    - must be PIC
+    - environment vars must be set if needed
+    - NOP Sled
+
+> BEWARE bad characters, especially in shellcode
+
+Beating stack canaries:
+
+- bruteforce
+- info leak
+- overwrite master canary
+- with static canaries or a fork:  
+overwrite canary byte by byte and this way find out the whole canary
+
+Beating NX:
+
+- ret2libc
+
+Beating ASLR:
+
+- information leak
+- bruteforce (32bit only)  
+since last 12 bits are static we don't have to guess everything!  
+partial rewrite: overwrite the LS 2 bytes (of which 12 out of 16 bits are static) -> 2^4 possible solutions
