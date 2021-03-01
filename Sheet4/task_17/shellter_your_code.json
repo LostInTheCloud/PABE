@@ -1,0 +1,31 @@
+[
+  {
+    "name": "CWE215",
+    "version": "0.2",
+    "addresses": [],
+    "tids": [],
+    "symbols": [],
+    "other": [],
+    "description": "(Information Exposure Through Debug Information) The binary contains debug symbols."
+  },
+  {
+    "name": "CWE676",
+    "version": "0.1",
+    "addresses": [
+      "080491ad"
+    ],
+    "tids": [
+      "instr_080491ad_2"
+    ],
+    "symbols": [
+      "welcomeMe"
+    ],
+    "other": [
+      [
+        "dangerous_function",
+        "gets"
+      ]
+    ],
+    "description": "(Use of Potentially Dangerous Function) welcomeMe (080491ad) -> gets"
+  }
+]

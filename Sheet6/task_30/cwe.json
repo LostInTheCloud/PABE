@@ -1,0 +1,89 @@
+[
+  {
+    "name": "CWE190",
+    "version": "0.1",
+    "addresses": [
+      "0010139d"
+    ],
+    "tids": [
+      "instr_0010139d_2"
+    ],
+    "symbols": [
+      "malloc"
+    ],
+    "other": [],
+    "description": "(Integer Overflow or Wraparound) Potential overflow due to multiplication before call to malloc at 0010139d"
+  },
+  {
+    "name": "CWE215",
+    "version": "0.2",
+    "addresses": [],
+    "tids": [],
+    "symbols": [],
+    "other": [],
+    "description": "(Information Exposure Through Debug Information) The binary contains debug symbols."
+  },
+  {
+    "name": "CWE332",
+    "version": "0.1",
+    "addresses": [],
+    "tids": [],
+    "symbols": [],
+    "other": [],
+    "description": "(Insufficient Entropy in PRNG) program uses rand without calling srand before"
+  },
+  {
+    "name": "CWE476",
+    "version": "0.3",
+    "addresses": [
+      "0010139d",
+      "001014c5"
+    ],
+    "tids": [
+      "instr_0010139d_2",
+      "instr_001014c5_2"
+    ],
+    "symbols": [
+      "malloc"
+    ],
+    "other": [],
+    "description": "(NULL Pointer Dereference) There is no check if the return value is NULL at 0010139d (malloc)."
+  },
+  {
+    "name": "CWE476",
+    "version": "0.3",
+    "addresses": [
+      "001012f5",
+      "00101391"
+    ],
+    "tids": [
+      "instr_001012f5_2",
+      "instr_00101391_1"
+    ],
+    "symbols": [
+      "malloc"
+    ],
+    "other": [],
+    "description": "(NULL Pointer Dereference) There is no check if the return value is NULL at 001012f5 (malloc)."
+  },
+  {
+    "name": "CWE676",
+    "version": "0.1",
+    "addresses": [
+      "001011db"
+    ],
+    "tids": [
+      "instr_001011db_2"
+    ],
+    "symbols": [
+      "print_pretty_header"
+    ],
+    "other": [
+      [
+        "dangerous_function",
+        "strlen"
+      ]
+    ],
+    "description": "(Use of Potentially Dangerous Function) print_pretty_header (001011db) -> strlen"
+  }
+]
