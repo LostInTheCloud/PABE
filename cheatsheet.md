@@ -15,7 +15,7 @@
 install stuff
 ```
 sudo pacman -S gdb pwndbg python python-pwntools code git \
-               ghidra nmap gcc lib32-gcc-libs lib32-glibc
+               ghidra nmap gcc lib32-gcc-libs lib32-glibc ropgadget
 ```
 ---
 use **PWNDBG**
@@ -53,6 +53,7 @@ Strip symbols and sections: `strip a.out`
 Tracing: `ltrace` or `strace`  
 Fiding bugs: `valgrind` or `-fsanitize-address`  
 Finding strings in binary: `strings a.out`
+ROPGadgets: `ROPgadget --binary /usr/lib/libc-2.33.so | grep ": pop rax ; ret"`
 
 ---
 
@@ -212,9 +213,7 @@ Backwardslice: Trace a value to its origin.
 
 ---
 
-### Binary Exploitation
-
-#### Buffer overflow: 
+### Buffer overflows: 
 
 - return to a function in the binary
 - return to shellcode injected by pwner
@@ -222,6 +221,11 @@ Backwardslice: Trace a value to its origin.
     - must be PIC
     - environment vars must be set if needed
     - NOP Sled
+    - denullify: remove bad characters
+        - mov eax, 0 -> xor eax, eax
+        - mov eax, 5 -> movl al, 5
+        - mov -> push/pop
+    - obfuscating
 
 > BEWARE bad characters, especially in shellcode
 
@@ -237,9 +241,25 @@ Beating NX:
 
 - ret2libc
 
+Beating NX on 64Bit:
+
+- can't put params onto stack, instead, have to put them into registers
+- ROP Chain to execute setup
+    > intel code can be interpreted and executed from any offset!
+    - careful with side effects
+    - can use libc to increase the available ropgadgets
+- use ROP to either ret2lib
+- or to disable NX with `mprotect`
+
 Beating ASLR:
 
 - information leak
 - bruteforce (32bit only)  
 since last 12 bits are static we don't have to guess everything!  
 partial rewrite: overwrite the LS 2 bytes (of which 12 out of 16 bits are static) -> 2^4 possible solutions
+
+---
+
+### Heap Overflow
+
+- Dangling Pointer
