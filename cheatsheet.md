@@ -35,7 +35,8 @@ time traveling:
  - enable recording `target record-full` 
  - reverse continue `rc`
  - reverse step over `rni`
- - backwards execution `set exec-direction reverse`
+ - backwards execution `set exec-direction reverse`  
+fastbins: `fastbins`
 
 ---
 
@@ -290,3 +291,9 @@ Chunks (used):
 - P 0x1: PREV_INUSE
 - M 0x2: IS_MAPPED
 - A 0x4: NON_MAIN_ARENA
+
+Consolidation:
+- only smallbin and largebin
+- when a free borders an already free chunk will be consumed
+- consumed chunk will be removed from list
+
