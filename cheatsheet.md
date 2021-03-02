@@ -262,4 +262,31 @@ partial rewrite: overwrite the LS 2 bytes (of which 12 out of 16 bits are static
 
 ### Heap Overflow
 
-- Dangling Pointer
+- Dangling Pointer -> UAF
+
+Arena: 
+- has bins inside
+- can be shared among threads, or just be for one exclusive
+
+Bins:
+- Only Free Chunks are in the bin 
+- store linked lists of free chunks
+- fastbins are single, others double
+- fastbins are LIFO, others are FIFO
+
+Chunks:
+- minimum of 4* ptrsize
+- always a multiple of 8 bytes
+- ls bits of sizefields are used to store data: AMP
+
+Chunks (used):
+- prev and next pointer in the bin
+- prev_size
+- mchunk_size
+- some info on big blocks (not relevant)
+
+> AMP: Info about the chunks
+
+- P 0x1: PREV_INUSE
+- M 0x2: IS_MAPPED
+- A 0x4: NON_MAIN_ARENA
