@@ -13,13 +13,13 @@
 
 ---
 install stuff
-```
+```bash
 sudo pacman -S gdb pwndbg python python-pwntools code git \
                ghidra nmap gcc lib32-gcc-libs lib32-glibc ropgadget
 ```
 ---
 use **PWNDBG**
-```
+```bash
 echo 'source /usr/share/pwndbg/gdbinit.py' >> ~/.gdbinit
 ```
 run with args `run foo bar`  
@@ -70,7 +70,7 @@ See security measures of binary: `checksec ./a.out`
 See info about the ELF Header: `readelf -h a.out`  
 Strip symbols and sections: `strip a.out`  
 Tracing: `ltrace` or `strace`  
-Fiding bugs: `valgrind` or `-fsanitize-address`  
+Fiding bugs: `valgrind` or compilation with `-fsanitize-address`  
 Finding strings in binary: `strings a.out`
 ROPGadgets: `ROPgadget --binary /usr/lib/libc-2.33.so | grep ": pop rax ; ret"`
 
@@ -129,7 +129,7 @@ Dissassembly:
 
 ---
 
-#### Calling Conventions
+Calling Conventions
 
 | name | arch | parametres | return | cleanup | perserves |
 |:---: |:---: |:---:       |:---:   |:---:    |:---:      |
@@ -311,7 +311,7 @@ The Unlink Exploit (old)
 
 <img src="docs/todo.png" alt="drawing" width="200"/>
 
-### TCache
+### TCache Poisoning
 
 <img src="docs/todo.png" alt="drawing" width="200"/>
 
@@ -343,7 +343,7 @@ Prepare heap so we create new object at specific location.
 - `%n` stores the number of written bytes into passed argument
 
 1) find parametre offset of the target address:  
-    ```
+    ```bash
     for i in {1..200}; 
         do echo -n "$i: ";
         ./a.out $(echo -e "AAAABBBB...%1\$00008x%$i\$p%1\$00008x%$i\$p");
@@ -360,13 +360,87 @@ Other targets to overwrite: function pointers, library hooks, ...
 
 > RELRO (relocation read-only): partial is fine, full relro makes GOT read-only.
 
+---
+
 ### ASAN
 
-<img src="docs/todo.png" alt="drawing" width="200"/>
+- out of bounds (heap, stack, globals)
+- use after free
+- use after return
+- use after scope
+- double free
+- memory leaks (experimental)
+
+> ASAN doesn't protect during runtime, it's only helping to find bugs!
+
+Compiler adds new instructions: checks for poison on memory access
+
+> ASAN is a heavy hit on performance
+
+Shadow Memory:
+
+- shows if memory is poisoned
+- mapping from memory to shadow memory
+- seperate region in memory
+
+Memory is aligned to 8 Bytes.
+
+Shadow memory byte is:
+- 0                 -> all 8 bytes unpoisoned
+- \<0               -> all 8 bytes are poisoned
+- \>= 1 and <=7     -> first k bytes are unpoisoned, the rest is poisoned
+
+Mapping: `shadow_addr = (addr >> 3) + offset`
+
+Offset: static, `0x7fff8000` for 64-Bit GNU/Linux
+
+`free()` -> poison whole block  
+put block into quarantine -> UAF detected
+
+> ASAN won't protect from overwriting other allocated objects
+
+Generally, FN are possible to happen.
+
+---
 
 ### Fuzzing
 
-<img src="docs/todo.png" alt="drawing" width="200"/>
+1) generate input
+2) give it to binary
+3) binary misbehaves?
+4) analyze crash, find a bug
+
+- Dumbfuzzing: just random input
+- Coverage Guided Fuzzing:
+    - input with initial input
+    - grab next input
+    - mutate it
+    - observe: if more branches are hit, add iput to queue
+
+Fuzzers:
+
+- radamsa (dumb)
+- AFL, libfuzzer, and hongfuzz (coverage guided)
+- AFL `-Q` or hongfuzz (black-box) 
+
+Whitebox: full knowledge of the target source  
+Blackbox: need to use output or tracing like `strace` or emulation
+
+Checklist:  
+- Compile with `afl-gcc`  
+- Also remember to compile libraries with `afl-gcc`
+
+Corpus:
+- high coverage wanted
+- not too big
+- no dupes
+- `afl-tmin` -> minimize corpus
+- `afl-cmin` -> remove cases that have the same coverage
+
+AFL uses execution path of crashes:
+- different paths can trigger the same bug
+- same execution paths can trigger different bugs
+- could add stack trace
 
 ### Exim RCE
 
