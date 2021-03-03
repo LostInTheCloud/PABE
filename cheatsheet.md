@@ -177,8 +177,7 @@ C Language Issues:
 - Out of Bounds
 - Double Free
 - Memory Leaks
-
-> TODO: C TYPE PROMOTION??? <img src="docs/todo.png" alt="drawing" width="38"/>
+- Type Promotion
 
 ### CVE vs CWE
 
@@ -307,14 +306,42 @@ Consolidation:
 - when a free borders an already free chunk will be consumed
 - consumed chunk will be removed from list
 
-The Unlink Exploit (old)
+The Unlink Exploit
 
-<img src="docs/todo.png" alt="drawing" width="200"/>
+- Metadata Heap Overflow
+- Write What Where
+
+So what do we do?
+
+- add shellcode and/or padding into C1  
+overflow metadata of C2:
+- set `C2->prev_size` and `C2->size` to `-4`  
+- set `C2->fwd` to the GOT entry we want to overwrite
+- set `C2->bck` to the shellcode addr
+
+What happens?
+
+- to see if the next chunk (C2) is free, it checks the nextnext chunks `prev_inuse` bit
+- this next chunk is `C2_ptr+C2->size` which equals `C2_ptr-4`
+- the `prev_inuse` flag is in the `size` byte, which is `chunk_ptr+4`, so here `C2_ptr-4+4:=C2`, or `C2->prev_size`, which equals `-4`, i.e. the `prev_inuse` is NOT set.
+- now the allocator will consolitate C1 and C2.
+- C2 will now be unlinked from the free list, i.e.:  
+```
+FWD := C2->fwd # GOT_entry
+BCK := C2->bck # shellcode_addr
+*(FWD->bck) = BCK # writes shellcode to GOT_entry
+*(BCK->fwd) = FWD # writes C1->fwd into Shellcode
+```
+
+> To prevent broken shellcode, have an indirect jump before the bytes that are being overwritten
+
+> There used to be no checks, now it checks e.g. if `fwd->bck == self` and `bck->fwd == self`
 
 ### TCache Poisoning
 
 <img src="docs/todo.png" alt="drawing" width="200"/>
 
+> Safe-Linking: fwd pointer is protected with mask of heap address
 
 ### Use After Free
 
@@ -444,4 +471,7 @@ AFL uses execution path of crashes:
 
 ### Exim RCE
 
-<img src="docs/todo.png" alt="drawing" width="200"/>
+- base encoding: 3n+1 required usually  
+- BUT: 3n+2 required if illegal encoding
+- then using feng shui to overwrite some metadata in the custom memory management
+- only works without ASLR
