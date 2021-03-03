@@ -162,14 +162,6 @@ C Language Issues:
 
 > TODO: C TYPE PROMOTION??? <img src="docs/todo.png" alt="drawing" width="38"/>
 
-### ASAN
-
-<img src="docs/todo.png" alt="drawing" width="200"/>
-
-### Fuzzing
-
-<img src="docs/todo.png" alt="drawing" width="200"/>
-
 ### CVE vs CWE
 
 - Common Vulnerabilities and Exposures: a weakness in a program
@@ -297,5 +289,26 @@ Consolidation:
 - when a free borders an already free chunk will be consumed
 - consumed chunk will be removed from list
 
-The Unlink Exploit
+The Unlink Exploit (old)
 
+<img src="docs/todo.png" alt="drawing" width="200"/>
+
+### Use After Free
+
+<img src="docs/todo.png" alt="drawing" width="200"/>
+
+### Fmt Str Exploits
+
+<img src="docs/todo.png" alt="drawing" width="200"/>
+
+### ASAN
+
+<img src="docs/todo.png" alt="drawing" width="200"/>
+
+### Fuzzing
+
+<img src="docs/todo.png" alt="drawing" width="200"/>
+
+### Exim RCE
+
+<img src="docs/todo.png" alt="drawing" width="200"/>
