@@ -36,7 +36,25 @@ time traveling:
  - reverse continue `rc`
  - reverse step over `rni`
  - backwards execution `set exec-direction reverse`  
-fastbins: `fastbins`
+
+fastbins: `fastbins`  
+getting the GOT entries: `gotplt`  
+
+---
+
+use **PWNTOOLS**
+
+Format String Exploit:
+```python
+from pwn import *
+
+def exec_fmt(payload: str)->str:
+    # wrapper that handles the io to the format string function
+
+autofmt = FmtStr(exec_fmt)
+offset = autofmt.offset
+payload = fmtstr_payload(offset, {target_addr: target_data})
+```
 
 ---
 
@@ -293,13 +311,54 @@ The Unlink Exploit (old)
 
 <img src="docs/todo.png" alt="drawing" width="200"/>
 
-### Use After Free
+### TCache
 
 <img src="docs/todo.png" alt="drawing" width="200"/>
+
+
+### Use After Free
+
+Dangling pointers can cause unexpected behaviour or code execution, also leakage of data.
+
+### VTables
+
+<img src="docs/todo.png" alt="drawing" width="200"/>
+
+### Heap Feng Shui
+
+Prepare heap so we create new object at specific location.
 
 ### Fmt Str Exploits
 
-<img src="docs/todo.png" alt="drawing" width="200"/>
+- `printf` determines the amount of params by reading the fmtstr, NOT from the number of params passed.
+
+- `"%p.%p.%p.%p"` to map out the stack
+
+- `%s` to read until the next `\0`
+
+- `%5$p` is the 5th param as a pointer -> arbitrary read
+
+> READ WHAT WHERE with `%n`
+
+- `%n` stores the number of written bytes into passed argument
+
+1) find parametre offset of the target address:  
+    ```
+    for i in {1..200}; 
+        do echo -n "$i: ";
+        ./a.out $(echo -e "AAAABBBB...%1\$00008x%$i\$p%1\$00008x%$i\$p");
+        echo;
+    done | grep 41
+    > 127: AAAABBBB...080482600x41414141080482600x4141414141
+    ```
+2) find GOT entry for `exit()` using pwndbg
+
+3) overwrite GOT entry using `%n`  
+    - split the addr into parts: `%hhn` writes a single byte only
+
+Other targets to overwrite: function pointers, library hooks, ...
+
+> RELRO (relocation read-only): partial is fine, full relro makes GOT read-only.
 
 ### ASAN
 
