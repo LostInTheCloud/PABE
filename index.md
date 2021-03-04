@@ -90,10 +90,10 @@ Further Tools:
 ### Linux and System
 ---
 | | | | |
-:---:|:---:|:---:|:---:
-Half Word | Word | Double Word | Quad Word
-8bit | 16bit | 32bit | 64bit
-char | short | int | long 
+|:---:|:---:|:---:|:---:|
+|Half Word | Word | Double Word | Quad Word|
+|8bit | 16bit | 32bit | 64bit|
+|char | short | int | long |
 
 ---
 Stack alignment: 
