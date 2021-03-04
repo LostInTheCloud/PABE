@@ -108,8 +108,26 @@ Seccomp:
 ---
 ### ELF Files
 
-<img src="docs/todo.png" alt="drawing" width="200"/>
+ELF (Executable and Linkable Format) under UNIX
+- ELF header:  magic byte 0x7f454c46 (0x7f, ELF)
+- program headers
+- section headers
+- .text segment:  code
+- .(ro)data segment:  (read only) data
+- .dynstr / .dynsym segment
+- .bss segment
+- .got:  global offset table
+- .plt:  (lazy) procedure linkage table
+ 
+ ---
 
+Segments vs Sections:
+- Segment: info for the OS about permissions and where segment should be stored in memory
+- Section: info for the linker
+
+> **Sections** are **IN Segments**
+
+ --- 
 ### Static Analysis (whiteboxing)
 
 - parse the binary directly
@@ -178,6 +196,8 @@ C Language Issues:
 - Double Free
 - Memory Leaks
 - Type Promotion
+
+---
 
 ### CVE vs CWE
 
@@ -339,7 +359,16 @@ BCK := C2->bck # shellcode_addr
 
 ### TCache Poisoning
 
-<img src="docs/todo.png" alt="drawing" width="200"/>
+- per thread cache
+- 64 LIFO bins
+- single linked
+- very fast
+
+> TCache doesn't use the checks modern glibc uses for the other bins!
+
+- overwrite next_ptr
+- pop off tcache entries again
+- pointer to overwritten next_ptr gets returned
 
 > Safe-Linking: fwd pointer is protected with mask of heap address
 
@@ -349,7 +378,9 @@ Dangling pointers can cause unexpected behaviour or code execution, also leakage
 
 ### VTables
 
-<img src="docs/todo.png" alt="drawing" width="200"/>
+- C++ objects have a virtual function table (vtable)
+- vtables contains pointer to the functions of the class of the object
+- overwrite vtable pointer to have great control over the control flow
 
 ### Heap Feng Shui
 
